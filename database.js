@@ -1,22 +1,18 @@
-const Database = require("better-sqlite3");
+const mysql = require("mysql2");
 
-const db = new Database("banco.db");
+const db = mysql.createConnection({
+    host: "localhost",
+    user: "root",
+    password: "SUA_SENHA",
+    database: "cadastro_de_usuarios_e_publicacoes"
+});
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS usuarios (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    nome TEXT NOT NULL,
-    email TEXT NOT NULL UNIQUE,
-    senha TEXT NOT NULL
-  );
-
-  CREATE TABLE IF NOT EXISTS publicacoes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    usuario_id INTEGER NOT NULL,
-    titulo TEXT NOT NULL,
-    conteudo TEXT NOT NULL,
-    FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
-  );
-`);
+db.connect((err) => {
+    if (err) {
+        console.error("Erro ao conectar:", err);
+        return;
+    }
+    console.log("Conectado ao MySQL!");
+});
 
 module.exports = db;
