@@ -1,21 +1,19 @@
-require("dotenv").config();
-
 const mysql = require("mysql2");
 
-const DB = mysql.createConnection({
-    host: "localhost",
-    user: "root",
-    password: process.env.DB_PASSWORD,
-    database: "cadastro_de_usuarios_e_publicacoes"
+const db = mysql.createConnection({
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME
 });
 
-DB.connect((err) => {
-    if (err) {
-        console.error("Erro ao conectar:", err);
-        return;
-    }
+db.connect((erro) => {
+  if (erro) {
+    console.error("Erro ao conectar:", erro);
+    return;
+  }
 
-    console.log("Conectado ao MySQL!");
+  console.log("Conectado ao MySQL!");
 });
 
-module.exports = DB;
+module.exports = db;
