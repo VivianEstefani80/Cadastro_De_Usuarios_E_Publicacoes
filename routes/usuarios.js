@@ -6,24 +6,30 @@ const router = express.Router();
 
 // Consultar usuário
 router.get("/:id", verificarToken, (req, res) => {
-  const usuario = db.prepare(`
-    SELECT id, nome, email
-    FROM usuarios
-    WHERE id = ?
-  `).get(req.params.id);
+  db.query(
+    "SELECT id, nome, email FROM usuarios WHERE id = ?",
+    [req.params.id],
+    (erro, resultados) => {
+      if (erro) {
+        return res.status(500).json({
+          erro: "Erro ao consultar usuário"
+        });
+      }
 
-  if (!usuario) {
-    return res.status(404).json({
-      erro: "Usuário não encontrado"
-    });
-  }
+      if (resultados.length === 0) {
+        return res.status(404).json({
+          erro: "Usuário não encontrado"
+        });
+      }
 
-  res.status(200).json(usuario);
+      res.status(200).json(resultados[0]);
+    }
+  );
 });
 
 // Editar usuário
 router.put("/:id", verificarToken, (req, res) => {
-  if (req.usuario.id !== Number(req.params.id)) {
+  if (Number(req.usuario.id) !== Number(req.params.id)) {
     return res.status(403).json({
       erro: "Sem permissão"
     });
@@ -37,54 +43,56 @@ router.put("/:id", verificarToken, (req, res) => {
     });
   }
 
-  try {
-    const resultado = db.prepare(`
-      UPDATE usuarios
-      SET nome = ?, email = ?
-      WHERE id = ?
-    `).run(nome, email, req.params.id);
+  db.query(
+    "UPDATE usuarios SET nome = ?, email = ? WHERE id = ?",
+    [nome, email, req.params.id],
+    (erro, resultado) => {
+      if (erro) {
+        return res.status(400).json({
+          erro: "E-mail já cadastrado ou dados inválidos"
+        });
+      }
 
-    if (!resultado.changes) {
-      return res.status(404).json({
-        erro: "Usuário não encontrado"
+      if (resultado.affectedRows === 0) {
+        return res.status(404).json({
+          erro: "Usuário não encontrado"
+        });
+      }
+
+      res.status(200).json({
+        mensagem: "Usuário atualizado"
       });
     }
-
-    res.status(200).json({
-      mensagem: "Usuário atualizado"
-    });
-  } catch (erro) {
-    res.status(400).json({
-      erro: "E-mail já cadastrado ou dados inválidos"
-    });
-  }
+  );
 });
 
 // Excluir usuário
 router.delete("/:id", verificarToken, (req, res) => {
-  if (req.usuario.id !== Number(req.params.id)) {
+  if (Number(req.usuario.id) !== Number(req.params.id)) {
     return res.status(403).json({
       erro: "Sem permissão"
     });
   }
 
-  try {
-    const resultado = db.prepare(
-      "DELETE FROM usuarios WHERE id = ?"
-    ).run(req.params.id);
+  db.query(
+    "DELETE FROM usuarios WHERE id = ?",
+    [req.params.id],
+    (erro, resultado) => {
+      if (erro) {
+        return res.status(500).json({
+          erro: "Não foi possível excluir o usuário"
+        });
+      }
 
-    if (!resultado.changes) {
-      return res.status(404).json({
-        erro: "Usuário não encontrado"
-      });
+      if (resultado.affectedRows === 0) {
+        return res.status(404).json({
+          erro: "Usuário não encontrado"
+        });
+      }
+
+      res.status(204).send();
     }
-
-    res.status(204).send();
-  } catch (erro) {
-    res.status(500).json({
-      erro: "Não foi possível excluir o usuário"
-    });
-  }
+  );
 });
 
 module.exports = router;
