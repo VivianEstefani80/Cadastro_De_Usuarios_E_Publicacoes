@@ -6,14 +6,20 @@ const router = express.Router();
 
 // Listar publicações: acesso aberto
 router.get("/", (req, res) => {
-  const publicacoes = db.prepare(`
-    SELECT publicacoes.id, titulo, conteudo,
-           usuarios.nome AS autor
+  db.query(`
+    SELECT publicacoes.id, publicacoes.titulo,
+           publicacoes.conteudo, usuarios.nome AS autor
     FROM publicacoes
     JOIN usuarios ON usuarios.id = publicacoes.usuario_id
-  `).all();
+  `, (erro, resultados) => {
+    if (erro) {
+      return res.status(500).json({
+        erro: "Erro ao listar publicações"
+      });
+    }
 
-  res.status(200).json(publicacoes);
+    res.status(200).json(resultados);
+  });
 });
 
 // Criar publicação: usuário logado
@@ -26,78 +32,122 @@ router.post("/", verificarToken, (req, res) => {
     });
   }
 
-  const resultado = db.prepare(`
-    INSERT INTO publicacoes (usuario_id, titulo, conteudo)
-    VALUES (?, ?, ?)
-  `).run(req.usuario.id, titulo, conteudo);
+  db.query(
+    `INSERT INTO publicacoes (usuario_id, titulo, conteudo)
+     VALUES (?, ?, ?)`,
+    [req.usuario.id, titulo, conteudo],
+    (erro, resultado) => {
+      if (erro) {
+        return res.status(500).json({
+          erro: "Erro ao criar publicação"
+        });
+      }
 
-  res.status(201).json({
-    id: resultado.lastInsertRowid,
-    titulo,
-    conteudo
-  });
+      res.status(201).json({
+        id: resultado.insertId,
+        titulo,
+        conteudo
+      });
+    }
+  );
 });
 
 // Editar publicação: somente o dono
 router.put("/:id", verificarToken, (req, res) => {
-  const publicacao = db.prepare(
-    "SELECT * FROM publicacoes WHERE id = ?"
-  ).get(req.params.id);
+  db.query(
+    "SELECT * FROM publicacoes WHERE id = ?",
+    [req.params.id],
+    (erro, resultados) => {
+      if (erro) {
+        return res.status(500).json({
+          erro: "Erro ao consultar publicação"
+        });
+      }
 
-  if (!publicacao) {
-    return res.status(404).json({
-      erro: "Publicação não encontrada"
-    });
-  }
+      const publicacao = resultados[0];
 
-  if (publicacao.usuario_id !== req.usuario.id) {
-    return res.status(403).json({
-      erro: "Sem permissão"
-    });
-  }
+      if (!publicacao) {
+        return res.status(404).json({
+          erro: "Publicação não encontrada"
+        });
+      }
 
-  const { titulo, conteudo } = req.body;
+      if (Number(publicacao.usuario_id) !== Number(req.usuario.id)) {
+        return res.status(403).json({
+          erro: "Sem permissão"
+        });
+      }
 
-  if (!titulo || !conteudo) {
-    return res.status(400).json({
-      erro: "Título e conteúdo são obrigatórios"
-    });
-  }
+      const { titulo, conteudo } = req.body;
 
-  db.prepare(`
-    UPDATE publicacoes
-    SET titulo = ?, conteudo = ?
-    WHERE id = ?
-  `).run(titulo, conteudo, req.params.id);
+      if (!titulo || !conteudo) {
+        return res.status(400).json({
+          erro: "Título e conteúdo são obrigatórios"
+        });
+      }
 
-  res.status(200).json({
-    mensagem: "Publicação atualizada"
-  });
+      db.query(
+        `UPDATE publicacoes
+         SET titulo = ?, conteudo = ?
+         WHERE id = ?`,
+        [titulo, conteudo, req.params.id],
+        (erro) => {
+          if (erro) {
+            return res.status(500).json({
+              erro: "Erro ao atualizar publicação"
+            });
+          }
+
+          res.status(200).json({
+            mensagem: "Publicação atualizada"
+          });
+        }
+      );
+    }
+  );
 });
 
 // Excluir publicação: somente o dono
 router.delete("/:id", verificarToken, (req, res) => {
-  const publicacao = db.prepare(
-    "SELECT * FROM publicacoes WHERE id = ?"
-  ).get(req.params.id);
+  db.query(
+    "SELECT * FROM publicacoes WHERE id = ?",
+    [req.params.id],
+    (erro, resultados) => {
+      if (erro) {
+        return res.status(500).json({
+          erro: "Erro ao consultar publicação"
+        });
+      }
 
-  if (!publicacao) {
-    return res.status(404).json({
-      erro: "Publicação não encontrada"
-    });
-  }
+      const publicacao = resultados[0];
 
-  if (publicacao.usuario_id !== req.usuario.id) {
-    return res.status(403).json({
-      erro: "Sem permissão"
-    });
-  }
+      if (!publicacao) {
+        return res.status(404).json({
+          erro: "Publicação não encontrada"
+        });
+      }
 
-  db.prepare(
-    "DELETE FROM publicacoes WHERE id = ?"
-  ).run(req.params.id);
+      if (Number(publicacao.usuario_id) !== Number(req.usuario.id)) {
+        return res.status(403).json({
+          erro: "Sem permissão"
+        });
+      }
 
-  res.status(204).send();
+      db.query(
+        "DELETE FROM publicacoes WHERE id = ?",
+        [req.params.id],
+        (erro) => {
+          if (erro) {
+            return res.status(500).json({
+              erro: "Erro ao excluir publicação"
+            });
+          }
+
+          res.status(204).send();
+        }
+      );
+    }
+  );
 });
 
 module.exports = router;
