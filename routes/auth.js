@@ -16,64 +16,81 @@ router.post("/cadastro", (req, res) => {
     });
   }
 
-  try {
-    const hash = bcrypt.hashSync(senha, 10);
+  const hash = bcrypt.hashSync(senha, 10);
 
-    const resultado = db.prepare(`
-      INSERT INTO usuarios (nome, email, senha)
-      VALUES (?, ?, ?)
-    `).run(nome, email, hash);
+  db.query(
+    "INSERT INTO usuarios (nome, email, senha) VALUES (?, ?, ?)",
+    [nome, email, hash],
+    (erro, resultado) => {
+      if (erro) {
+        return res.status(400).json({
+          erro: "Não foi possível cadastrar. Verifique o e-mail."
+        });
+      }
 
-    res.status(201).json({
-      id: resultado.lastInsertRowid,
-      nome,
-      email
-    });
-  } catch (erro) {
-    res.status(400).json({
-      erro: "Não foi possível cadastrar. Verifique se o e-mail já existe."
-    });
-  }
+      res.status(201).json({
+        id: resultado.insertId,
+        nome,
+        email
+      });
+    }
+  );
 });
 
 // Login
 router.post("/login", (req, res) => {
   const { email, senha } = req.body;
 
-  const usuario = db.prepare(
-    "SELECT * FROM usuarios WHERE email = ?"
-  ).get(email);
+  db.query(
+    "SELECT * FROM usuarios WHERE email = ?",
+    [email],
+    (erro, resultados) => {
+      if (erro) {
+        return res.status(500).json({
+          erro: "Erro no banco de dados"
+        });
+      }
 
-  if (!usuario || !bcrypt.compareSync(senha, usuario.senha)) {
-    return res.status(401).json({
-      erro: "E-mail ou senha incorretos"
-    });
-  }
+      const usuario = resultados[0];
 
-  const token = jwt.sign(
-    { id: usuario.id },
-    process.env.JWT_SECRET,
-    { expiresIn: "2h" }
+      if (!usuario || !bcrypt.compareSync(senha, usuario.senha)) {
+        return res.status(401).json({
+          erro: "E-mail ou senha incorretos"
+        });
+      }
+
+      const token = jwt.sign(
+        { id: usuario.id },
+        process.env.JWT_SECRET,
+        { expiresIn: "2h" }
+      );
+
+      res.json({ token });
+    }
   );
-
-  res.json({ token });
 });
 
 // Consultar perfil
 router.get("/perfil", verificarToken, (req, res) => {
-  const usuario = db.prepare(`
-    SELECT id, nome, email
-    FROM usuarios
-    WHERE id = ?
-  `).get(req.usuario.id);
+  db.query(
+    "SELECT id, nome, email FROM usuarios WHERE id = ?",
+    [req.usuario.id],
+    (erro, resultados) => {
+      if (erro) {
+        return res.status(500).json({
+          erro: "Erro ao consultar perfil"
+        });
+      }
 
-  if (!usuario) {
-    return res.status(404).json({
-      erro: "Usuário não encontrado"
-    });
-  }
+      if (resultados.length === 0) {
+        return res.status(404).json({
+          erro: "Usuário não encontrado"
+        });
+      }
 
-  res.json(usuario);
+      res.json(resultados[0]);
+    }
+  );
 });
 
 module.exports = router;
